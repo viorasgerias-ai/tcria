@@ -54,11 +54,25 @@ class DesktopContractTests(unittest.TestCase):
 
 
 class DesktopWindowTests(unittest.TestCase):
-    def setUp(self):
+    # A single Tk interpreter per process: creating/destroying several tk.Tk()
+    # on macOS (Aqua) hangs or aborts with Tcl_AsyncDelete. Each test gets a Toplevel.
+    @classmethod
+    def setUpClass(cls):
         try:
-            self.root = tk.Tk()
+            cls.tk_root = tk.Tk()
         except tk.TclError as exc:
-            self.skipTest("Tela gráfica indisponível: " + str(exc))
+            raise unittest.SkipTest("Tela gráfica indisponível: " + str(exc))
+        cls.tk_root.withdraw()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tk_root.update()
+        cls.tk_root.destroy()
+        del cls.tk_root
+        gc.collect()
+
+    def setUp(self):
+        self.root = tk.Toplevel(self.tk_root)
         self.root.withdraw()
         self.addCleanup(self.teardown_tk)
         self.app = Desktop(self.root)
@@ -87,7 +101,7 @@ class DesktopWindowTests(unittest.TestCase):
     def wait(self):
         deadline = time.monotonic() + 10
         while self.app.busy and time.monotonic() < deadline:
-            self.root.update()
+            self.tk_root.update()
             time.sleep(0.01)
         self.assertFalse(self.app.busy, "A interface não recebeu a conclusão da operação")
 
