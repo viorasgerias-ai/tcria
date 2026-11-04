@@ -1,0 +1,40 @@
+name: TCRA Automator Organizator
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  organize-and-immutability:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate required repository files
+        run: |
+          set -euo pipefail
+          required_files=("README.md" "LICENSE" ".automator-organizator.sha256")
+          for file in "${required_files[@]}"; do
+            if [[ ! -f "$file" ]]; then
+              echo "::error file=$file::Missing required file: $file"
+              exit 1
+            fi
+          done
+
+      - name: Verify tracked file immutability manifest
+        run: |
+          set -euo pipefail
+          tmp_manifest="$(mktemp)"
+          git ls-files -z \
+            | grep -zv '^\.automator-organizator\.sha256$' \
+            | LC_ALL=C sort -z \
+            | xargs -0 sha256sum > "$tmp_manifest"
+
+          if ! diff -u .automator-organizator.sha256 "$tmp_manifest"; then
+            echo "::error::Tracked file hashes changed. Update .automator-organizator.sha256 intentionally."
+            exit 1
+          fi

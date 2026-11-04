@@ -199,6 +199,26 @@ To keep the repository root clean and professional:
 
 ---
 
+## TCRA Automator Organizator pipeline
+
+The repository includes the GitHub Actions workflow `.github/workflows/automator-organizator.yml`.
+
+It validates:
+
+- required repository files (`README.md`, `LICENSE`, `.automator-organizator.sha256`);
+- tracked-file immutability by comparing current file hashes against `.automator-organizator.sha256`.
+
+When intentional repository changes are made, regenerate the manifest before committing:
+
+```bash
+git ls-files -z \
+  | grep -zv '^\.automator-organizator\.sha256$' \
+  | LC_ALL=C sort -z \
+  | xargs -0 sha256sum > .automator-organizator.sha256
+```
+
+---
+
 ## Current professionalization goals
 
 This repository now prioritizes:
