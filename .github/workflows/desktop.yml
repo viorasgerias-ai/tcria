@@ -26,6 +26,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Testar núcleo e interface
+        timeout-minutes: 8
         run: python -m unittest discover -v
       - name: Instalar ferramenta de compilação
         run: python -m pip install -r packaging/requirements-build.txt

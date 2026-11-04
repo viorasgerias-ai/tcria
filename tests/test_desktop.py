@@ -1,4 +1,8 @@
+import faulthandler
 import gc
+import os
+if os.environ.get("CI"):
+    faulthandler.dump_traceback_later(180, exit=True)  # never hang CI silently
 import importlib.util
 import json
 import tempfile
