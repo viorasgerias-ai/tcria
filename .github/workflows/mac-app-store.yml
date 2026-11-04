@@ -1,0 +1,58 @@
+name: Mac App Store (pkg)
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['packaging/**', 'scripts/build_app_store.sh', 'tcria/**', '.github/workflows/mac-app-store.yml']
+permissions:
+  contents: read
+jobs:
+  pkg:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      APP_BUNDLE_ID: ${{ vars.APP_BUNDLE_ID || 'forcebrax.com' }}
+      HAS_CERT: ${{ secrets.APPLE_SIGNING_CERT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r packaging/requirements-build.txt
+      # Optional: runs only if the secrets exist (they are NOT configured today).
+      - name: Importar certificados (opcional)
+        if: env.HAS_CERT == 'true'
+        env:
+          APPLE_SIGNING_CERT: ${{ secrets.APPLE_SIGNING_CERT }}
+          APPLE_SIGNING_CERT_PASSWORD: ${{ secrets.APPLE_SIGNING_CERT_PASSWORD }}
+          APPLE_INSTALLER_CERT: ${{ secrets.APPLE_INSTALLER_CERT }}
+          APPLE_INSTALLER_CERT_PASSWORD: ${{ secrets.APPLE_INSTALLER_CERT_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}-kc
+        run: |
+          KC="$RUNNER_TEMP/build.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KC"
+          for pair in "APPLE_SIGNING_CERT:APPLE_SIGNING_CERT_PASSWORD" "APPLE_INSTALLER_CERT:APPLE_INSTALLER_CERT_PASSWORD"; do
+            c="${pair%%:*}"; p="${pair##*:}"
+            [ -n "${!c}" ] || continue
+            echo "${!c}" | base64 --decode > "$RUNNER_TEMP/$c.p12"
+            security import "$RUNNER_TEMP/$c.p12" -k "$KC" -P "${!p}" -T /usr/bin/codesign -T /usr/bin/productbuild
+          done
+          security list-keychains -d user -s "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KC" >/dev/null
+          if [ -n "$APPLE_PROVISIONING_PROFILE" ]; then
+            echo "$APPLE_PROVISIONING_PROFILE" | base64 --decode > "$RUNNER_TEMP/app.provisionprofile"
+            echo "MAS_PROVISIONING_PROFILE=$RUNNER_TEMP/app.provisionprofile" >> "$GITHUB_ENV"
+          fi
+      - name: Compilar .app e .pkg
+        env:
+          MAS_APP_IDENTITY: ${{ secrets.MAS_APP_IDENTITY }}
+          MAS_INSTALLER_IDENTITY: ${{ secrets.MAS_INSTALLER_IDENTITY }}
+        run: scripts/build_app_store.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oranizator-igualizator-macos-appstore-pkg
+          path: release/*
+          if-no-files-found: error
+          retention-days: 30

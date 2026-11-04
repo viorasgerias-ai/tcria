@@ -117,17 +117,20 @@ class Desktop:
         except Exception as exc:
             self.failure(exc)
 
-    def text_field(self, parent, label, variable):
+    def text_field(self, parent, label, variable, readonly=False):
         row = ttk.Frame(parent)
         row.pack(fill="x", pady=4)
         ttk.Label(row, text=label, width=25, wraplength=185).pack(side="left")
         entry = ttk.Entry(row, textvariable=variable)
         entry.pack(side="left", fill="x", expand=True)
+        if readonly:
+            # App Sandbox: paths come only from the system dialogs (user-selected access).
+            entry.state(["readonly"])
         self.controls.append(entry)
         return row
 
     def path_field(self, parent, label, variable, new=False, file=False):
-        row = self.text_field(parent, label, variable)
+        row = self.text_field(parent, label, variable, readonly=True)
         def browse():
             selected = filedialog.askopenfilename(parent=self.root) if file else filedialog.askdirectory(parent=self.root)
             if selected:
