@@ -1,3 +1,4 @@
+import gc
 import importlib.util
 import json
 import tempfile
@@ -55,14 +56,29 @@ class DesktopWindowTests(unittest.TestCase):
         except tk.TclError as exc:
             self.skipTest("Tela gráfica indisponível: " + str(exc))
         self.root.withdraw()
-        self.addCleanup(self.root.destroy)
+        self.addCleanup(self.teardown_tk)
         self.app = Desktop(self.root)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.base = Path(self.tmp.name)
+        self.base = Path(self.tmp.name).resolve()
         self.source = self.base / "entrada"
         self.source.mkdir()
         (self.source / "doc.txt").write_text("Exemplo sintético. 2026-11-04. Processo: ABC.")
+
+    def teardown_tk(self):
+        # Join the worker, then destroy and collect Tk on the main thread to
+        # avoid Tcl_AsyncDelete aborts on macOS.
+        worker = getattr(self.app, "worker", None)
+        if worker is not None:
+            worker.join(10)
+        if getattr(self.app, "poll_id", None):
+            try:
+                self.root.after_cancel(self.app.poll_id)
+            except tk.TclError:
+                pass
+        self.root.destroy()
+        del self.app, self.root
+        gc.collect()
 
     def wait(self):
         deadline = time.monotonic() + 10
