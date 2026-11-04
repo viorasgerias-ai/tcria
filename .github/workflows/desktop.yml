@@ -1,0 +1,41 @@
+name: Instaladores desktop
+on:
+  workflow_dispatch:
+  push:
+    branches: ['main']
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            artifact: windows-x64
+          - runner: macos-15-intel
+            artifact: macos-x86_64
+          - runner: macos-15
+            artifact: macos-arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Testar núcleo e interface
+        run: python -m unittest discover -v
+      - name: Instalar ferramenta de compilação
+        run: python -m pip install -r packaging/requirements-build.txt
+      - name: Compilar aplicativo e instalador
+        run: python scripts/build_desktop.py
+      - name: Instalar e testar pacote gerado
+        run: python scripts/smoke_installer.py
+      - name: Disponibilizar instalador e SHA-256
+        uses: actions/upload-artifact@v4
+        with:
+          name: oranizator-igualizator-${{ matrix.artifact }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 30

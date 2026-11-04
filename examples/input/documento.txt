@@ -1,0 +1,3 @@
+Documento sintético para demonstrar o pipeline.
+Origem declarada pelo operador: exemplo de teste.
+Nenhuma conclusão sobre fatos reais deve ser extraída deste documento.

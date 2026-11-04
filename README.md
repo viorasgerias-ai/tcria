@@ -1,230 +1,108 @@
- TCRIA
+# oranizator-igualizator — pipeline local de integridade documental
 
-**TCRIA** is a governance-oriented system for legal evidence processing.
+Aplicativo local com interface gráfica e linha de comando em Python 3.11+, baseado no `pipeline_operacional_v01.zip` fornecido pelo responsável pelo projeto. Funciona offline, sem IA e sem dependências de execução externas.
 
-It is designed to help organize heterogeneous legal materials, preserve documentary traceability, and generate auditable bundles without turning the system into an automatic accusation engine. The core objective is to keep evidence processing structured while leaving legal judgment and narrative responsibility with the human operator.
+Recebe uma árvore de arquivos, preserva cópias byte a byte, registra SHA-256 e verificações explícitas, gera relatório e permite devolver os arquivos aos mesmos caminhos relativos. Os originais permanecem no lugar. Os nomes e subpastas são preservados; arquivos diferentes nunca são sobrescritos na devolução.
 
----
+## Windows e macOS
 
-## Executive summary
+A versão 0.3 acrescenta uma interface gráfica offline para organizar, conferir, devolver arquivos e registrar revisão humana. Para abrir pelo código-fonte:
 
-TCRIA helps teams and operators:
-
-- ingest mixed legal document collections;
-- classify documentary artifacts;
-- record traceability and governance signals;
-- block or warn on risky accusatory content;
-- generate auditable outputs in JSON, Markdown, and PDF.
-
-The project is intentionally focused on **organization, chain of custody, and governance discipline**.
-
----
-
-## What the system does
-
-TCRIA treats document processing as a **custody workflow**:
-
-1. document ingestion;
-2. classification;
-3. traceability signals;
-4. governance gates;
-5. audit bundle generation.
-
-This makes the system useful for:
-
-- legal audits;
-- investigation support;
-- evidence organization;
-- documentary review workflows;
-- controlled preparation of governed case materials.
-
----
-
-## Governance boundaries
-
-TCRIA is built around a simple rule: **automation can organize and audit evidence, but accountability for accusatory narrative promotion must remain human-declared**.
-
-The system therefore applies governance checks such as:
-
-- **prescriptiveGate** — blocks condemnatory or prescriptive language;
-- **complianceGate** — requires explicit human accountability metadata in strict mode;
-- **traceabilityCheck** — looks for dates, references, markers, and evidence signals.
-
-### Decision record example
-
-```text
-[TCR-IA DECISION RECORD]
-responsibleHuman: Rodrigo Baptista da Silva
-declaredPurpose: Auditoria documental e organização de evidências para fins jurídicos
-approved: YES
-approvedAt: 2026-03-05
-[/TCR-IA DECISION RECORD]
+```bash
+python3 -m tcria.desktop
 ```
 
----
+As receitas de instaladores Windows x64 (`.exe`) e macOS Intel/Apple Silicon (`.dmg`) estão em `packaging/` e `scripts/`. O workflow `.github/workflows/desktop.yml` compila e testa cada pacote no sistema de destino. **Os instaladores são gerados pelo GitHub Actions após o envio à main.** Consulte a execução mais recente de “Instaladores desktop” para baixar os artefatos e confirmar a validação nativa. Consulte [docs/DESKTOP.md](docs/DESKTOP.md) para requisitos, instruções, testes e pendências de assinatura.
 
-## What TCRIA does not do
+## Executar
 
-TCRIA intentionally does **not**:
+Na raiz do repositório, sem instalação:
 
-- generate legal pleadings;
-- write accusations automatically;
-- construct legal theses autonomously;
-- replace human legal judgment.
-
----
-
-## Repository structure
-
-The repository is organized so that code, operational scripts, documentation, and example artifacts are visually separated.
-
-```text
-.
-├── tcria/                  # Core package: engine, models, CLI support, settings
-├── api/                    # FastAPI application
-├── app/                    # Streamlit entrypoints / app layer
-├── scripts/                # Script-oriented utilities and legacy helpers
-├── docs/                   # Architecture and domain documentation
-│   └── project-snapshots/  # Saved project structure snapshots and diffs
-├── examples/
-│   ├── audit-artifacts/    # Versioned sample outputs and reports
-│   └── demo_case_documents/# Example input materials
-├── tests/                  # Automated tests
-├── run_governance_pipeline.py
-├── app.py
-└── pyproject.toml
+```bash
+python3 -m tcria run examples/input output/caso-001 --responsible "Operador de teste" --origin "Exemplo sintético"
+python3 -m tcria verify output/caso-001
+python3 -m unittest discover -v
 ```
 
-### Folder conventions
-
-- **`tcria/`**: reusable product logic.
-- **`api/`**: HTTP entrypoints and request/response orchestration.
-- **`app/`**: UI/app runtime layer.
-- **`scripts/`**: operational scripts and support generators.
-- **`docs/`**: conceptual documentation and project snapshots.
-- **`examples/`**: curated example inputs and sample generated artifacts.
-
----
-
-## Installation
-
-From the repository root:
+Também funciona `python3 pipeline.py ...`. Para disponibilizar o comando `tcria`:
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -e .
+. .venv/bin/activate
+python3 -m pip install -e .
+tcria --help
 ```
 
----
-
-## CLI usage
-
-### Basic scan
+Cada execução exige uma saída nova, fora da árvore de entrada. `run` devolve `result_hash` e `anchor`. Guarde o valor de `anchor` em local protegido independente. O `anchor.sha256` junto do bundle é apenas uma cópia de transporte.
 
 ```bash
-tcria scan ~/Downloads --strict
+python3 -m tcria verify output/caso-001 --trusted-anchor HASH_GUARDADO
 ```
 
-### Modular product audit
+Códigos de saída: 0 = operação concluída; 1 = erro ou verificação inválida; 2 = auditoria estrita bloqueada. Nenhum deles equivale a aprovação humana.
+
+## Devolver às mesmas pastas
+
+O argumento `destination` é a raiz de onde vieram os arquivos, ou uma nova raiz para exportar cópias. Não é necessário mover os originais para processá-los.
 
 ```bash
-tcria product-audit ~/Downloads --strict --out-dir output/audit --output-stem audit
+python3 -m tcria restore output/caso-001 /caminho/da/pasta-original --trusted-anchor HASH_GUARDADO --dry-run
+python3 -m tcria restore output/caso-001 /caminho/da/pasta-original --trusted-anchor HASH_GUARDADO
 ```
 
-### Official pipeline mode
+Por exemplo, `entrada/cliente/a.txt` e `entrada/outro/a.txt` voltam como `destino/cliente/a.txt` e `destino/outro/a.txt`. Arquivo existente com hash igual fica intacto (`UNCHANGED`). Um arquivo ausente é copiado (`COPY`) e conferido novamente. Arquivo existente com bytes diferentes bloqueia o lote antes da primeira cópia. A simulação não cria pastas nem arquivos. A devolução exige âncora independente e bundle íntegro.
+
+## Revisão humana
+
+A decisão fica em registro separado, vinculado ao hash exato do bundle, sem reescrever o resultado técnico:
 
 ```bash
-tcria product-audit ~/Downloads --strict --official-pipeline --output-stem my_case
+python3 -m tcria review output/caso-001 --records-dir output/revisoes --trusted-anchor HASH_GUARDADO --responsible "Revisor de teste" --decision REQUEST_CHANGES --reason "Regras ainda pendentes"
+python3 -m tcria verify-review output/caso-001 output/revisoes/ID_RETORNADO.json --trusted-anchor HASH_GUARDADO
 ```
 
-### Direct pipeline command
+Decisões: `APPROVE`, `REJECT`, `REQUEST_CHANGES`. Nome declarado não é autenticação. Preserve também o hash retornado da decisão em armazenamento protegido; uma revisão autoconsistente não comprova identidade ou assinatura.
+
+## Organização
+
+```text
+tcria/                  núcleo, CLI e interface gráfica; devolução e revisão humana
+pipeline.py             compatibilidade com o comando do ZIP
+desktop_launcher.py     entrada para executáveis desktop e teste empacotado
+packaging/              PyInstaller, dependência de build e Inno Setup
+scripts/                compilação nativa e teste dos instaladores
+tests/                  testes com dados sintéticos
+examples/input/         entrada sintética fornecida no ZIP
+docs/                   especificação, limites e documentação anterior
+.github/workflows/      testes automáticos
+```
+
+Cada saída contém `originals/` com os mesmos nomes e subpastas, `bundle.json`, `ledger.json`, `report.md`, `anchor.sha256` e o marcador `COMPLETE`. O manifesto associa cada arquivo ao hash, tamanho, origem declarada e responsável. O relatório mostra cada regra e suas lacunas.
+
+O README anterior está preservado em [docs/README_ANTERIOR.md](docs/README_ANTERIOR.md). Seus comandos e serviços descrevem o projeto anterior; não são funcionalidades desta implementação. O README do ZIP está preservado em [docs/PIPELINE_ORIGINAL.md](docs/PIPELINE_ORIGINAL.md).
+
+## Verificações e limites
+
+TXT, Markdown e JSON têm verificação de UTF-8; JSON também tem validação sintática. Outros formatos são preservados com extração `UNKNOWN`. Datas e referências são marcadores lexicais com posições no texto decodificado: não comprovam validade de data, autenticidade ou verdade factual. Metadados ausentes, vazios e inválidos têm códigos distintos.
+
+O `prescriptiveGate` fica `UNKNOWN / RULE_NOT_PROVIDED`, pois suas regras não foram fornecidas. Com `--strict`, qualquer lacuna bloqueia o fluxo, inclusive essa regra pendente. Sem modo estrito, o relatório exige revisão das lacunas. Não há aprovação automática.
+
+A integridade usa JSON canônico UTF-8 (`sort_keys=True`, separadores sem espaços, `ensure_ascii=False`, NaN rejeitado) e SHA-256. O hash do evento exclui seu próprio campo de hash. O resultado é determinístico; registros de revisão contêm identificadores e horários próprios, fora desse resultado.
+
+Hashes detectam alterações contra uma referência; não tornam o armazenamento fisicamente imutável. Controle de acesso, armazenamento WORM, assinatura/autenticação, isolamento entre módulos, metadados por arquivo, correções encadeadas, OCR/PDF e integrações externas continuam pendentes. Não há regras proprietárias ou serviço de IA nesta versão. Consulte [docs/IMPLEMENTACAO.md](docs/IMPLEMENTACAO.md) para os limites operacionais e [docs/ESPECIFICACAO_CODEX.md](docs/ESPECIFICACAO_CODEX.md) para a especificação completa.
+
+Nome do produto definido pelo responsável: **oranizator-igualizator**. O repositório e o pacote interno continuam `tcria`; essa alteração não registra nome ou identificador na Apple.
+
+## Conferência dos arquivos do repositório
+
+O workflow `.github/workflows/automator-organizator.yml`, incorporado no PR #1, foi preservado. Ele compara os arquivos versionados com `.automator-organizator.sha256`. Essa verificação é independente do motor de documentos e não substitui seus testes ou a referência externa dos bundles.
+
+Ao alterar arquivos intencionalmente, coloque as mudanças no índice do Git e depois regenere o manifesto antes do commit:
 
 ```bash
-python3 run_governance_pipeline.py --path ~/Downloads --strict --output-stem my_case
-python3 run_governance_pipeline.py --path ~/Downloads --strict --legacy-audit-script --output-stem my_case
+git add .
+git ls-files -z | grep -zv '^\.automator-organizator\.sha256$' | LC_ALL=C sort -z | xargs -0 sha256sum > .automator-organizator.sha256
+git add .automator-organizator.sha256
 ```
 
-### Case workspace flow
-
-```bash
-tcria case init complice
-tcria case run complice --strict
-tcria investigate complice
-```
-
----
-
-## API
-
-Run the API locally:
-
-```bash
-uvicorn api.api:app --reload
-```
-
-Main endpoints:
-
-- `GET /health`
-- `GET /capabilities`
-- `POST /audit`
-- `POST /audit/official-pipeline`
-- `GET /responses/audit-types`
-- `GET /responses/institutional-profiles`
-- `POST /responses/audit`
-- `POST /responses/institutional-output`
-- `POST /audit/openai-summary`
-- `POST /cases/init`
-- `POST /cases/run`
-- `POST /cases/investigate`
-- `POST /investigations/full-run`
-- `POST /conclusions/from-bundle`
-
----
-
-## Architecture note
-
-The architecture overview in `docs/architecture-overview.md` is kept as the project's current high-level representation. Operational implementation remains package- and script-oriented, and the repository structure is organized to support that working style cleanly.
-
----
-
-## Sample artifacts and snapshots
-
-To keep the repository root clean and professional:
-
-- curated generated sample outputs are stored in `examples/audit-artifacts/`;
-- project-structure snapshots and diffs are stored in `docs/project-snapshots/`;
-- runtime outputs can continue to be generated in local working directories such as `output/` or case folders.
-
----
-
-## TCRA Automator Organizator pipeline
-
-The repository includes the GitHub Actions workflow `.github/workflows/automator-organizator.yml`.
-
-It validates:
-
-- required repository files (`README.md`, `LICENSE`, `.automator-organizator.sha256`);
-- tracked-file immutability by comparing current file hashes against `.automator-organizator.sha256`.
-
-When intentional repository changes are made, regenerate the manifest before committing:
-
-```bash
-git ls-files -z \
-  | grep -zv '^\.automator-organizator\.sha256$' \
-  | LC_ALL=C sort -z \
-  | xargs -0 sha256sum > .automator-organizator.sha256
-```
-
----
-
-## Current professionalization goals
-
-This repository now prioritizes:
-
-- consistent structure;
-- executive README presentation;
-- visual separation between code, scripts, docs, and artifacts;
-- predictable folder naming;
-- less noise in the repository root.
+O README anterior ao envio do aplicativo foi preservado em `docs/README_GITHUB_ANTES_DO_APLICATIVO.md`. Atualizar o manifesto junto dos arquivos permite mudanças intencionais; ele não é uma âncora externa de imutabilidade.

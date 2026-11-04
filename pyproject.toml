@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oranizator-igualizator"
+version = "0.3.0"
+description = "Pipeline local determinístico de integridade documental"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+tcria = "tcria.pipeline:main"
+
+[project.gui-scripts]
+tcria-desktop = "tcria.desktop:main"
+
+[tool.setuptools.packages.find]
+include = ["tcria*"]
