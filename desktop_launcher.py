@@ -17,7 +17,7 @@ def self_test():
     root.update_idletasks()
     root.destroy()
     with tempfile.TemporaryDirectory() as tmp:
-        base = Path(tmp)
+        base = Path(tmp).resolve()  # macOS: /var -> /private/var symlink
         source = base / "entrada" / "subpasta"
         source.mkdir(parents=True)
         (source / "documento.txt").write_text("Exemplo sintético. 2026-11-04. Processo: TESTE-001.", encoding="utf-8")
