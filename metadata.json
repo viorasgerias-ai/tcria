@@ -1,0 +1,8 @@
+{
+  "name": "oranizator-igualizator",
+  "description": "Pipeline local de integridade documental. Organiza cópias, calcula SHA-256, confere alterações, devolve arquivos com segurança e registra revisões humanas sem envio à internet.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
