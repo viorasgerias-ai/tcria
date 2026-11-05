@@ -1,3 +1,9 @@
+import faulthandler
+import gc
+import os
+import sys
+if os.environ.get("CI"):
+    faulthandler.dump_traceback_later(180, exit=True)  # never hang CI silently
 import importlib.util
 import json
 import tempfile
@@ -49,28 +55,63 @@ class DesktopContractTests(unittest.TestCase):
 
 
 class DesktopWindowTests(unittest.TestCase):
-    def setUp(self):
+    # A single Tk interpreter per process: creating/destroying several tk.Tk()
+    # on macOS (Aqua) hangs or aborts with Tcl_AsyncDelete. Each test gets a Toplevel.
+    @classmethod
+    def setUpClass(cls):
         try:
-            self.root = tk.Tk()
+            cls.tk_root = tk.Tk()
         except tk.TclError as exc:
-            self.skipTest("Tela gráfica indisponível: " + str(exc))
+            raise unittest.SkipTest("Tela gráfica indisponível: " + str(exc))
+        cls.tk_root.withdraw()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tk_root.update()
+        cls.tk_root.destroy()
+        del cls.tk_root
+        gc.collect()
+
+    def setUp(self):
+        self.root = tk.Toplevel(self.tk_root)
         self.root.withdraw()
-        self.addCleanup(self.root.destroy)
+        self.addCleanup(self.teardown_tk)
         self.app = Desktop(self.root)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.base = Path(self.tmp.name)
+        self.base = Path(self.tmp.name).resolve()
         self.source = self.base / "entrada"
         self.source.mkdir()
         (self.source / "doc.txt").write_text("Exemplo sintético. 2026-11-04. Processo: ABC.")
 
+    def teardown_tk(self):
+        # Join the worker, then destroy and collect Tk on the main thread to
+        # avoid Tcl_AsyncDelete aborts on macOS.
+        worker = getattr(self.app, "worker", None)
+        if worker is not None:
+            worker.join(10)
+        if getattr(self.app, "poll_id", None):
+            try:
+                self.root.after_cancel(self.app.poll_id)
+            except tk.TclError:
+                pass
+        self.root.destroy()
+        del self.app, self.root
+        gc.collect()
+
     def wait(self):
         deadline = time.monotonic() + 10
         while self.app.busy and time.monotonic() < deadline:
-            self.root.update()
+            self.tk_root.update()
             time.sleep(0.01)
         self.assertFalse(self.app.busy, "A interface não recebeu a conclusão da operação")
 
+    # GitHub's macOS runners have no logged-in Aqua session: after a worker
+    # completes, Tk's update() blocks forever inside Tcl (traceback captured with
+    # faulthandler, run 41939197731). The same flow runs on Windows CI and the
+    # core logic is covered on macOS by test_custody/test_pipeline; run it
+    # locally on a Mac with a real display.
+    @unittest.skipIf(sys.platform == "darwin" and os.environ.get("CI"), "macOS CI runner without an interactive Aqua session")
     def test_organize_verify_restore_and_review_via_interface(self):
         self.app.source.set(str(self.source))
         self.app.output.set(str(self.base / "resultado"))

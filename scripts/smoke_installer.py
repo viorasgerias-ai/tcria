@@ -14,7 +14,7 @@ def main():
     if not installer.is_file():
         raise FileNotFoundError(installer)
     with tempfile.TemporaryDirectory() as tmp:
-        temporary = Path(tmp)
+        temporary = Path(tmp).resolve()
         report = temporary / "self-test.json"
         if sys.platform == "win32":
             destination = temporary / "oranizator-igualizator"

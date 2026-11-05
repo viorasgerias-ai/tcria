@@ -98,7 +98,7 @@ class Desktop:
         self.log.pack(fill="both", expand=True)
         ttk.Label(shell, text=f"Versão {APP_VERSION} · Funciona offline · SHA-256 detecta alterações; não impede edições.", wraplength=920).pack(anchor="w", pady=(6, 0))
         root.protocol("WM_DELETE_WINDOW", self.close)
-        root.after(100, self.poll)
+        self.poll_id = root.after(100, self.poll)
 
     def tab(self, notebook, title):
         frame = ttk.Frame(notebook, padding=14)
@@ -117,17 +117,20 @@ class Desktop:
         except Exception as exc:
             self.failure(exc)
 
-    def text_field(self, parent, label, variable):
+    def text_field(self, parent, label, variable, readonly=False):
         row = ttk.Frame(parent)
         row.pack(fill="x", pady=4)
         ttk.Label(row, text=label, width=25, wraplength=185).pack(side="left")
         entry = ttk.Entry(row, textvariable=variable)
         entry.pack(side="left", fill="x", expand=True)
+        if readonly:
+            # App Sandbox: paths come only from the system dialogs (user-selected access).
+            entry.state(["readonly"])
         self.controls.append(entry)
         return row
 
     def path_field(self, parent, label, variable, new=False, file=False):
-        row = self.text_field(parent, label, variable)
+        row = self.text_field(parent, label, variable, readonly=True)
         def browse():
             selected = filedialog.askopenfilename(parent=self.root) if file else filedialog.askdirectory(parent=self.root)
             if selected:
@@ -216,16 +219,22 @@ class Desktop:
         self.status.set("Processando… Aguarde a conclusão antes de fechar o aplicativo.")
         for widget in self.controls:
             widget.state(["disabled"])
-        def worker():
+        # Tk objects must only be touched (and released) on the main thread; the
+        # worker gets plain values and a queue, never a reference to self/Tk.
+        self.completed = completed
+        jobs = self.jobs
+        def worker(operation=operation):
             try:
-                self.jobs.put((operation(), None, completed))
+                jobs.put((operation(), None))
             except Exception as exc:
-                self.jobs.put((None, exc, None))
-        threading.Thread(target=worker, daemon=False).start()
+                jobs.put((None, exc))
+        self.worker = threading.Thread(target=worker, daemon=False)
+        self.worker.start()
 
     def poll(self):
         try:
-            result, error, completed = self.jobs.get_nowait()
+            result, error = self.jobs.get_nowait()
+            completed, self.completed = self.completed, None
         except queue.Empty:
             pass
         else:
@@ -242,7 +251,7 @@ class Desktop:
                 self.log.configure(state="disabled")
                 if completed:
                     completed(result)
-        self.root.after(100, self.poll)
+        self.poll_id = self.root.after(100, self.poll)
 
     def failure(self, error):
         self.status.set("A operação falhou; preserve o resultado parcial para diagnóstico, se houver.")

@@ -56,3 +56,12 @@ Nome do produto: `oranizator-igualizator`, mantendo exatamente a grafia informad
 ## Bundle ID informado pelo responsável
 
 Bundle ID: `forcebrax.com`, configurado exatamente como fornecido no empacotamento macOS. Este valor identifica o aplicativo; não é o Issuer ID da chave da API. A correspondência ao registro no Apple Developer/App Store Connect e à equipe precisa ser validada antes da assinatura e do envio.
+
+## Receita de build para a Mac App Store (App Sandbox)
+
+- Entitlements: `packaging/macos/app-store/entitlements.plist` (`com.apple.security.app-sandbox` e `com.apple.security.files.user-selected.read-write`); binários internos usam `entitlements-inherit.plist`.
+- Na interface, os campos de pasta/arquivo são somente leitura: o caminho só entra pelos diálogos do sistema (`filedialog`), que é o que concede acesso no sandbox. A "nova pasta de resultado" é criada dentro da pasta escolhida.
+- Build: `scripts/build_app_store.sh` (PyInstaller → codesign com entitlements → `productbuild` → `.pkg`). Workflow: `.github/workflows/mac-app-store.yml`.
+- Sem segredos, o `.app` recebe assinatura ad-hoc e o `.pkg` sai **não assinado** (apenas teste). A assinatura é opcional e usa segredos do GitHub que **não estão configurados**: `APPLE_SIGNING_CERT`/`APPLE_SIGNING_CERT_PASSWORD` (.p12 base64 "Apple Distribution"/"3rd Party Mac Developer Application"), `APPLE_INSTALLER_CERT`/`APPLE_INSTALLER_CERT_PASSWORD` ("3rd Party Mac Developer Installer"), `APPLE_PROVISIONING_PROFILE` (base64), `MAS_APP_IDENTITY`, `MAS_INSTALLER_IDENTITY`. Nunca envie esses dados na conversa.
+- Bundle ID configurável por `APP_BUNDLE_ID` (variável de repositório `vars.APP_BUNDLE_ID`); o padrão continua `forcebrax.com`. **Atenção:** a Apple usa DNS reverso; o valor provavelmente deveria ser algo como `com.forcebrax.oranizator`, e precisa ser idêntico ao App ID registrado no App Store Connect. O valor não foi alterado.
+- Envio: fazer no Mac com o app Transporter (notarização/`notarytool` é para fora da loja e não se aplica). Requer Xcode Command Line Tools (`xcode-select --install`); o Xcode completo não é obrigatório.

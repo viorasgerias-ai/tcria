@@ -1,9 +1,12 @@
 # Build only on the target OS. Python 3.12 includes tkinter on native installers.
+import os
 import sys
 import tomllib
 from pathlib import Path
 
 ROOT = Path(SPECPATH).parent
+# Bundle ID is configurable via env (default unchanged). Apple expects reverse-DNS, e.g. com.forcebrax.oranizator.
+BUNDLE_ID = os.environ.get("APP_BUNDLE_ID", "forcebrax.com")
 VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
 a = Analysis(
     [str(ROOT / "desktop_launcher.py")],
@@ -21,7 +24,7 @@ exe = EXE(
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="oranizator-igualizator")
 if sys.platform == "darwin":
     app = BUNDLE(
-        coll, name="oranizator-igualizator.app", bundle_identifier="forcebrax.com", version=VERSION,
+        coll, name="oranizator-igualizator.app", bundle_identifier=BUNDLE_ID, version=VERSION,
         info_plist={
             "CFBundleShortVersionString": VERSION,
             "NSHighResolutionCapable": True,
