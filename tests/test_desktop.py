@@ -1,6 +1,7 @@
 import faulthandler
 import gc
 import os
+import sys
 if os.environ.get("CI"):
     faulthandler.dump_traceback_later(180, exit=True)  # never hang CI silently
 import importlib.util
@@ -105,6 +106,12 @@ class DesktopWindowTests(unittest.TestCase):
             time.sleep(0.01)
         self.assertFalse(self.app.busy, "A interface não recebeu a conclusão da operação")
 
+    # GitHub's macOS runners have no logged-in Aqua session: after a worker
+    # completes, Tk's update() blocks forever inside Tcl (traceback captured with
+    # faulthandler, run 41939197731). The same flow runs on Windows CI and the
+    # core logic is covered on macOS by test_custody/test_pipeline; run it
+    # locally on a Mac with a real display.
+    @unittest.skipIf(sys.platform == "darwin" and os.environ.get("CI"), "macOS CI runner without an interactive Aqua session")
     def test_organize_verify_restore_and_review_via_interface(self):
         self.app.source.set(str(self.source))
         self.app.output.set(str(self.base / "resultado"))
