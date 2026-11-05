@@ -27,7 +27,15 @@ jobs:
           python-version: '3.12'
       - name: Testar núcleo e interface
         timeout-minutes: 8
-        run: python -m unittest discover -v
+        shell: bash
+        # macOS (Aqua) cannot run several Tk sessions reliably in one process
+        # (Tcl_AsyncDelete abort / update() hang), so each GUI test gets its own process.
+        run: |
+          set -e
+          python -m unittest -v tests.test_pipeline tests.test_custody tests.test_desktop.DesktopContractTests
+          for t in $(python -c "import unittest,tests.test_desktop as m; print(' '.join(unittest.TestLoader().getTestCaseNames(m.DesktopWindowTests)))"); do
+            python -m unittest -v "tests.test_desktop.DesktopWindowTests.$t"
+          done
       - name: Instalar ferramenta de compilação
         run: python -m pip install -r packaging/requirements-build.txt
       - name: Compilar aplicativo e instalador

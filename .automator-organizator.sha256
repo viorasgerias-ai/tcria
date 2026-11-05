@@ -1,5 +1,5 @@
 5c5c8d8069a40e419b77589edb844fab889d18f1986e6e1dc7baf81944e12646  .github/workflows/automator-organizator.yml
-a8fced6b5d0e84e8915d80fd03ba5ee1db55993ba7e75f95eb8cedcea19ed728  .github/workflows/desktop.yml
+76d3a34d7b6a87631e58df8e72efc0a7ddbf48a4e50140dc549e5be7bc9595df  .github/workflows/desktop.yml
 3ad6f77bfa022a70573002e035060fbdd28c0e1894318a2c8c5da3d8f59e903e  .github/workflows/mac-app-store.yml
 c82365e2a2346a5afdef0af906464f67a6d72e14023b826895649820879a45a0  .github/workflows/tests.yml
 68de7c485dda0ddb7602efb4455891b6770b99c69fefe243cc450e63638cf169  .gitignore
