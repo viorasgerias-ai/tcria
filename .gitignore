@@ -7,3 +7,6 @@ build/
 dist/
 release/
 *.spec.bak
+
+node_modules/
+.vite/
